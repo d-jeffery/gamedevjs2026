@@ -75,12 +75,21 @@ export const DEFAULT_CONFIG: BOFConfig = {
 export class BayesianOccupancyFilter {
     readonly config: Readonly<BOFConfig>;
     private state: BOFState;
-    private mapLayer: Tilemaps.TilemapLayer | Tilemaps.TilemapGPULayer;
+    private map: Array<Array<number>> | null;
 
-    constructor(config: Partial<BOFConfig> = {}, mapLayer: Tilemaps.TilemapLayer | Tilemaps.TilemapGPULayer) {
+    constructor(config: Partial<BOFConfig> = {}, map: number[][]) {
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.state = this.createInitialState();
-        this.mapLayer = mapLayer;
+        this.map = map;
+
+        for (let y = 0; y < this.map.length; y++) {
+            for (let x = 0; x < this.map[0].length; x++) {
+                // Walls have no belief
+                if (this.map[x][y] === 1) {
+                    this.state.belief[this.idx(x, y)] = 0;
+                }
+            }
+        }
     }
 
     // ---- public accessors ---------------------------------------------------
@@ -163,7 +172,8 @@ export class BayesianOccupancyFilter {
                 predicted[this.idx(x, y)] += b * pStay;
 
                 // Spread to 8-neighbors
-                const neighbors = this.neighbors8(x, y);
+                // const neighbors = this.neighbors8(x, y);
+                const neighbors = this.neighbors4(x, y);
                 const pMove = (1 - pStay) / neighbors.length; // equal weight per neighbor
                 for (const [nx, ny] of neighbors) {
                     predicted[this.idx(nx, ny)] += b * pMove;
@@ -239,7 +249,7 @@ export class BayesianOccupancyFilter {
 
     // -------------------------------------------------------------------------
     // Target motion model (ground truth, NOT part of the filter itself)
-    //   Each target chooses uniformly among its 8 neighbors with probability
+    //   Each target chooses uniformly among its 4/8 neighbors with probability
     //   (1 - pStay) and stays put otherwise.
     // -------------------------------------------------------------------------
 
@@ -247,7 +257,8 @@ export class BayesianOccupancyFilter {
         const { pStay } = this.config;
         for (const t of this.state.targets) {
             if (Math.random() < pStay) continue; // stay
-            const neighbors = this.neighbors8(t.x, t.y);
+            //const neighbors = this.neighbors8(t.x, t.y);
+            const neighbors = this.neighbors4(t.x, t.y);
             if (neighbors.length === 0) continue;
             const [nx, ny] = neighbors[Math.floor(Math.random() * neighbors.length)];
             t.x = nx;
@@ -304,6 +315,30 @@ export class BayesianOccupancyFilter {
         return y * this.config.width + x;
     }
 
+    private neighbors4(x: number, y: number): Array<[number, number]> {
+        const { width, height } = this.config;
+        const result: Array<[number, number]> = [];
+        const cardinal: Array<[number, number]> = [
+            [0, -1],  // north
+            [1, 0],  // east
+            [0, 1],  // south
+            [-1, 0],  // west
+        ];
+        for (const [dx, dy] of cardinal) {
+            const nx = x + dx;
+            const ny = y + dy;
+
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+
+                if (this.map && this.map[nx][ny] === 0) {
+                    result.push([nx, ny]);
+                }
+
+            }
+        }
+        return result;
+    }
+
     private neighbors8(x: number, y: number): Array<[number, number]> {
         const { width, height } = this.config;
         const result: Array<[number, number]> = [];
@@ -313,14 +348,10 @@ export class BayesianOccupancyFilter {
                 const nx = x + dx;
                 const ny = y + dy;
 
-                // Ignore tile
-                const tile = this.mapLayer.getTileAt(nx, ny, true);
-                if (tile && tile.index === 1) {
-                    continue;
-                }
-
                 if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                    result.push([nx, ny]);
+                    if (this.map && this.map[nx][ny] === 0) {
+                        result.push([nx, ny]);
+                    }
                 }
             }
         }

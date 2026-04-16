@@ -13,6 +13,7 @@
     "vite": "^8.0.4"
   },
   "dependencies": {
+    "easystarjs": "^0.4.4",
     "phaser": "^4.0.0",
     "phaser-raycaster": "^0.10.11"
   }

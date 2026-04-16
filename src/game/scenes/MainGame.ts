@@ -21,15 +21,18 @@ export class MainGame extends Scene {
     this.camera.setBackgroundColor(0xffffff);
 
     const map = [
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
-      [0, 1, 1, 1, 0, 0, 1, 1, 1, 0],
-      [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
-      [0, 1, 1, 1, 0, 0, 1, 1, 1, 0],
-      [0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     ];
     const tilemap = this.make.tilemap({ data: map, key: 'map', tileHeight: 16, tileWidth: 16 });
     const tileset = tilemap.addTilesetImage("tiles", "tiles");
@@ -45,12 +48,34 @@ export class MainGame extends Scene {
     // this.raycaster = this.raycasterPlugin.createRaycaster({});
 
     // this.ray = this.raycaster.createRay();
-    const robot1 = new RobotSprite(this, 50, 200, wallsLayer);
+    const robot1 = new RobotSprite(this, 50, 200, map);
+    // robot1.setFilter({
+    //   width: map[0].length,
+    //   height: map.length,
+    //   pStay: 0.2,
+    //   pDetect: 0.88,
+    //   pFalseAlarm: 0.07,
+    //   priorOccupancy: 0.1,
+    //   beliefMin: 0.01,
+    //   beliefMax: 0.99,
+    // });
+
+    robot1.setFilter({
+      width: map[0].length,
+      height: map.length,
+      pStay: 0.2,
+      pDetect: 0.88,
+      pFalseAlarm: 0.07,
+      priorOccupancy: 0.1,
+      beliefMin: 0.0,
+      beliefMax: 1.0,
+    })
 
     this.physics.add.collider(robot1, wallsLayer);
 
-    this.input.on("pointerdown", (pointer: Vector) => {
-      robot1.setCurrentTarget({ x: pointer.x, y: pointer.y });
-    });
+
+    // this.input.on("pointerdown", (pointer: Vector) => {
+    //   robot1.setCurrentTarget({ x: pointer.x, y: pointer.y });
+    // });
   }
 }
