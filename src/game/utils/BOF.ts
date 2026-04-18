@@ -82,14 +82,15 @@ export class BayesianOccupancyFilter {
         this.state = this.createInitialState();
         this.map = map;
 
-        for (let y = 0; y < this.map.length; y++) {
-            for (let x = 0; x < this.map[0].length; x++) {
-                // Walls have no belief
-                if (this.map[x][y] === 1) {
-                    this.state.belief[this.idx(x, y)] = 0;
-                }
-            }
-        }
+        // for (let y = 0; y < this.map.length; y++) {
+        //     for (let x = 0; x < this.map[0].length; x++) {
+        //         // Walls have no belief
+        //         if (this.map[x][y] === 1) {
+        //             this.state.belief[this.idx(x, y)] = 0;
+        //             this.state.predicted[this.idx(x, y)] = 0;
+        //         }
+        //     }
+        // }
     }
 
     // ---- public accessors ---------------------------------------------------
@@ -165,18 +166,24 @@ export class BayesianOccupancyFilter {
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                const b = belief[this.idx(x, y)];
+                if (this.map && this.map[x][y] === 1) continue;  // skip wall cells entirely
+
+                const i = this.idx(x, y);
+                const b = belief[i];
                 if (b < 1e-9) continue;
 
-                // Stay contribution
-                predicted[this.idx(x, y)] += b * pStay;
+                const allNeighbors = this.neighbors4(x, y);
+                const freeNeighbors = allNeighbors.filter(([nx, ny]) => {
+                    return !this.isWall(nx, ny);
+                });
+                const blockedCount = allNeighbors.length - freeNeighbors.length;
+                const pMovePerCell = (1 - pStay) / allNeighbors.length;
+                const effectiveStay = pStay + blockedCount * pMovePerCell;
 
-                // Spread to 8-neighbors
-                // const neighbors = this.neighbors8(x, y);
-                const neighbors = this.neighbors4(x, y);
-                const pMove = (1 - pStay) / neighbors.length; // equal weight per neighbor
-                for (const [nx, ny] of neighbors) {
-                    predicted[this.idx(nx, ny)] += b * pMove;
+                predicted[i] += b * effectiveStay;
+
+                for (const [nx, ny] of freeNeighbors) {
+                    predicted[this.idx(nx, ny)] += b * pMovePerCell;
                 }
             }
         }
@@ -229,19 +236,27 @@ export class BayesianOccupancyFilter {
     update(predicted: Float64Array, z: Uint8Array): Float64Array {
         const { pDetect, pFalseAlarm, beliefMin, beliefMax } = this.config;
         const belief = new Float64Array(predicted.length);
+        const { width, height } = this.config;
 
-        for (let i = 0; i < predicted.length; i++) {
-            const p = predicted[i];
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const i = this.idx(x, y);
 
-            // Likelihood of this detection given occupancy state
-            const lk = z[i] ? pDetect : 1 - pDetect; // P(z | occ)
-            const lf = z[i] ? pFalseAlarm : 1 - pFalseAlarm; // P(z | empty)
+                if (this.isWall(x, y)) {         // wall cells are always beliefMin
+                    belief[i] = beliefMin;
+                    continue;
+                }
 
-            const numerator = lk * p;
-            const denominator = numerator + lf * (1 - p);
+                const p = predicted[i];
+                const lk = z[i] ? pDetect : (1 - pDetect);
+                const lf = z[i] ? pFalseAlarm : (1 - pFalseAlarm);
 
-            const posterior = denominator < 1e-12 ? p : numerator / denominator;
-            belief[i] = Math.max(beliefMin, Math.min(beliefMax, posterior));
+                const numerator = lk * p;
+                const denominator = numerator + lf * (1 - p);
+                const posterior = denominator < 1e-12 ? p : numerator / denominator;
+
+                belief[i] = Math.max(beliefMin, Math.min(beliefMax, posterior));
+            }
         }
 
         return belief;
@@ -258,7 +273,9 @@ export class BayesianOccupancyFilter {
         for (const t of this.state.targets) {
             if (Math.random() < pStay) continue; // stay
             //const neighbors = this.neighbors8(t.x, t.y);
-            const neighbors = this.neighbors4(t.x, t.y);
+            const neighbors = this.neighbors4(t.x, t.y).filter(([nx, ny]) => {
+                return !this.isWall(nx, ny);
+            });
             if (neighbors.length === 0) continue;
             const [nx, ny] = neighbors[Math.floor(Math.random() * neighbors.length)];
             t.x = nx;
@@ -298,9 +315,13 @@ export class BayesianOccupancyFilter {
     topCells(n: number): Array<{ x: number; y: number; belief: number }> {
         const { width } = this.config;
         const b = this.state.belief;
-        const indices = Array.from({ length: b.length }, (_, i) => i);
+
+        const indices = Array.from({ length: b.length }, (_, i) => i)
+            .filter(i => !this.isWall(i % width, Math.floor(i / width)));
+
         indices.sort((a, b_) => b[b_] - b[a]);
-        return indices.slice(0, n).map((i) => ({
+
+        return indices.slice(0, n).map(i => ({
             x: i % width,
             y: Math.floor(i / width),
             belief: b[i],
@@ -329,11 +350,7 @@ export class BayesianOccupancyFilter {
             const ny = y + dy;
 
             if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-
-                if (this.map && this.map[nx][ny] === 0) {
-                    result.push([nx, ny]);
-                }
-
+                result.push([nx, ny]);
             }
         }
         return result;
@@ -349,9 +366,7 @@ export class BayesianOccupancyFilter {
                 const ny = y + dy;
 
                 if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                    if (this.map && this.map[nx][ny] === 0) {
-                        result.push([nx, ny]);
-                    }
+                    result.push([nx, ny]);
                 }
             }
         }
@@ -392,6 +407,11 @@ export class BayesianOccupancyFilter {
         for (const { x, y, occupied } of cells) {
             this.state.belief[this.idx(x, y)] = occupied ? beliefMax : beliefMin;
         }
+    }
+
+    isWall(x: number, y: number): boolean {
+        if (!this.map) return false;
+        return this.map && this.map[x][y] === 1
     }
 }
 

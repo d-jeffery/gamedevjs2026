@@ -62,7 +62,7 @@ class RobotSprite extends GameObjects.Sprite {
                 this.filter.applyHardEvidence(seen);
                 this.cellsSeen.clear();
 
-                const top3 = this.filter.topCells(2);
+                const top3 = this.filter.topCells(3);
 
                 if (!this.filter.maxBelief()) {
                     this.filter.reset(top3);
@@ -92,8 +92,8 @@ class RobotSprite extends GameObjects.Sprite {
             y = PMath.Between(0, this.map.length - 1);
         }
 
-        this.x = x * SQUARE_SIZE;
-        this.y = y * SQUARE_SIZE;
+        this.x = x * SQUARE_SIZE + SQUARE_SIZE / 2;
+        this.y = y * SQUARE_SIZE + SQUARE_SIZE / 2;
 
 
         this.health = 10;
@@ -107,7 +107,7 @@ class RobotSprite extends GameObjects.Sprite {
     update(time: number, deltaTime: number) {
         if (this.health <= 0) {
             this.respawn()
-            return;            //this.respawn();
+            return;
         }
 
         if (!this.body) return;
@@ -137,17 +137,30 @@ class RobotSprite extends GameObjects.Sprite {
             }
         } else if (this.path.length) {
             const newTagert = this.path.shift();
-            this.currentTarget = { x: newTagert.x * 32 + 16, y: newTagert.y * 32 + 16 }
+            this.currentTarget = {
+                x: newTagert.x * SQUARE_SIZE + SQUARE_SIZE / 2,
+                y: newTagert.y * SQUARE_SIZE + SQUARE_SIZE / 2
+            };
         } else {
             const target = this.filter.topCells(1)[0];
 
-            this.easystar.findPath(Math.floor((this.x) / 32), Math.floor((this.y) / 32), target.x, target.y, (path: Array<Vector>) => {
-                if (path === null) {
-                    throw Error("WHAT")
-                } else {
-                    this.path = path;
-                }
-            });
+            const startX = Math.floor(this.x / SQUARE_SIZE);
+            const startY = Math.floor(this.y / SQUARE_SIZE);
+
+            try {
+                this.easystar.findPath(startX, startY, target.x, target.y, (path: Array<Vector>) => {
+                    if (path === null) {
+                        console.log(startX, startY, target.x, target.y)
+                        console.log(this.map[target.x][target.y], target)
+                        throw Error("WHAT")
+                    } else {
+                        this.path = path;
+                    }
+                });
+            } catch (Error) {
+                console.log(this.x, this.y)
+                console.log(startX, startY)
+            }
             this.easystar.calculate();
         }
 
@@ -292,7 +305,7 @@ class RobotSprite extends GameObjects.Sprite {
             );
         }
 
-        const top3 = this.filter.topCells(2);
+        const top3 = this.filter.topCells(3);
         top3.forEach((guess) => {
             this.filterDebug.lineStyle(2, 0x000000, 1);
             this.filterDebug.fillStyle(
