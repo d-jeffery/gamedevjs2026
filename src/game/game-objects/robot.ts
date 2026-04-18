@@ -2,19 +2,20 @@
 import { GameObjects, Math as PMath, Tilemaps } from "phaser";
 import { BayesianOccupancyFilter, type BOFConfig } from "../utils/BOF";
 import easystarjs from "easystarjs";
-import type { Vector } from "matter";
 
+const SQUARE_SIZE = 32;
 
 class RobotSprite extends GameObjects.Sprite {
     private path;
     private currentTarget;
     private filter;
+    private debug;
     private filterDebug;
     private viewSlice;
     private map;
     private easystar;
     private cellsSeen;
-
+    private health;
 
     constructor(scene: Phaser.Scene, x: number, y: number, map: number[][]) {
         super(scene, x, y, "robot");
@@ -26,6 +27,10 @@ class RobotSprite extends GameObjects.Sprite {
         this.path = [];
 
         this.setScale(0.5, 0.5)
+
+        this.health = 10;
+
+        this.debug = true;
         // Enable arcade physics for moving with velocity
         scene.physics.world.enable(this);
 
@@ -47,8 +52,7 @@ class RobotSprite extends GameObjects.Sprite {
 
         this.cellsSeen = new Set<{ x: number; y: number; occupied: boolean }>();
 
-
-        this.filterDebug = scene.add.graphics();
+        if (this.debug) this.filterDebug = scene.add.graphics();
 
         scene.time.addEvent({
             delay: 250, callback: () => {
@@ -76,10 +80,36 @@ class RobotSprite extends GameObjects.Sprite {
         this.filter = new BayesianOccupancyFilter(config, this.map);
 
         // Spawn 5 targets at random positions
-        this.filter.spawnTargets(2);
+        this.filter.spawnTargets(3);
+    }
+
+    respawn() {
+        let x = PMath.Between(0, this.map[0].length - 1);
+        let y = PMath.Between(0, this.map.length - 1);
+
+        while (this.map[x][y] === 1) {
+            x = PMath.Between(0, this.map[0].length - 1);
+            y = PMath.Between(0, this.map.length - 1);
+        }
+
+        this.x = x * SQUARE_SIZE;
+        this.y = y * SQUARE_SIZE;
+
+
+        this.health = 10;
+        this.path = [];
+        this.currentTarget = null;
+        this.viewSlice.x = this.x;
+        this.viewSlice.y = this.y;
+        this.viewSlice.rotation = this.rotation;
     }
 
     update(time: number, deltaTime: number) {
+        if (this.health <= 0) {
+            this.respawn()
+            return;            //this.respawn();
+        }
+
         if (!this.body) return;
 
         // Stop any previous movement
@@ -121,22 +151,21 @@ class RobotSprite extends GameObjects.Sprite {
             this.easystar.calculate();
         }
 
-
-        const squareSize = 32;
+        const center = new PMath.Vector2({
+            x: this.viewSlice.x,
+            y: this.viewSlice.y,
+        })
         for (let i = 0; i < this.filter.getBelief().length; i++) {
             const row = Math.floor(i / this.map[0].length);
             const col = i % this.map.length;
 
+            const point = new PMath.Vector2({
+                x: col * SQUARE_SIZE + SQUARE_SIZE / 2,
+                y: row * SQUARE_SIZE + SQUARE_SIZE / 2,
+            });
+
             if (
-                isPointInCircleSlice(
-                    {
-                        x: col * squareSize + squareSize / 2,
-                        y: row * squareSize + squareSize / 2,
-                    },
-                    {
-                        x: this.viewSlice.x,
-                        y: this.viewSlice.y,
-                    },
+                isPointInCircleSlice(point, center,
                     120,
                     PMath.RadToDeg(this.viewSlice.rotation) - 45,
                     PMath.RadToDeg(this.viewSlice.rotation) + 45,
@@ -145,19 +174,56 @@ class RobotSprite extends GameObjects.Sprite {
                 //console.log(x, y, this.filter.getPredicted());
                 this.cellsSeen.add(JSON.stringify({ x: col, y: row, occupied: false }));
                 //this.filter.setCellBelief(col, row, "min");
-                this.filterDebug.fillStyle(0x00ffff, this.filter.getBelief()[i]);
-                this.filterDebug.fillRect(
-                    col * squareSize,
-                    row * squareSize,
-                    squareSize,
-                    squareSize,
-                );
+
+                if (this.debug) {
+                    this.filterDebug.fillStyle(0x00ffff, this.filter.getBelief()[i]);
+                    this.filterDebug.fillRect(
+                        col * SQUARE_SIZE,
+                        row * SQUARE_SIZE,
+                        SQUARE_SIZE,
+                        SQUARE_SIZE,
+                    );
+                }
                 // console.log(this.filter.getBelief()[i]);
             }
         }
 
 
-        this.debugFilter()
+        if (this.debug) this.debugFilter()
+
+
+        this.scene.robots.forEach(robot => {
+
+            if (this === robot) {
+                return;
+            }
+
+            const row = Math.floor(robot.x / this.map[0].length);
+            const col = Math.floor(robot.y / this.map.length);
+
+            if (
+                isPointInCircleSlice({ x: robot.x, y: robot.y }, center,
+                    120,
+                    PMath.RadToDeg(this.viewSlice.rotation) - 45,
+                    PMath.RadToDeg(this.viewSlice.rotation) + 45,
+                )
+            ) {
+                this.cellsSeen.add(JSON.stringify({ x: col, y: row, occupied: true }));
+
+                robot.health -= 1;
+
+                // if (this.debug) {
+                //     this.filterDebug.fillStyle(0x000000, 1.0);
+                //     this.filterDebug.fillRect(
+                //         robot.x - SQUARE_SIZE / 2,
+                //         robot.y - SQUARE_SIZE / 2,
+                //         SQUARE_SIZE,
+                //         SQUARE_SIZE,
+                //     );
+                // }
+            }
+        });
+
 
         // this.path.forEach((v) => {
         //     this.filterDebug.fillStyle(0xff00ff, 1.0)
@@ -187,6 +253,7 @@ class RobotSprite extends GameObjects.Sprite {
         this.rotation = angle;
         this.viewSlice.x = this.x;
         this.viewSlice.y = this.y;
+
         this.viewSlice.rotation = this.rotation;
     }
 
@@ -196,7 +263,7 @@ class RobotSprite extends GameObjects.Sprite {
 
     debugFilter() {
         // Update BOF filter
-        const squareSize = 32;
+        const SQUARE_SIZE = 32;
 
         this.filterDebug.clear();
 
@@ -212,16 +279,16 @@ class RobotSprite extends GameObjects.Sprite {
             this.filterDebug.lineStyle(2, 0x000000, 1);
             this.filterDebug.fillStyle(0xff0000, this.filter.getBelief()[i]);
             this.filterDebug.fillRect(
-                col * squareSize,
-                row * squareSize,
-                squareSize,
-                squareSize,
+                col * SQUARE_SIZE,
+                row * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
             );
             this.filterDebug.strokeRect(
-                col * squareSize,
-                row * squareSize,
-                squareSize,
-                squareSize,
+                col * SQUARE_SIZE,
+                row * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
             );
         }
 
@@ -233,16 +300,16 @@ class RobotSprite extends GameObjects.Sprite {
                 this.filter.getCellBelief(guess.x, guess.y),
             );
             this.filterDebug.fillRect(
-                guess.x * squareSize,
-                guess.y * squareSize,
-                squareSize,
-                squareSize,
+                guess.x * SQUARE_SIZE,
+                guess.y * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
             );
             this.filterDebug.strokeRect(
-                guess.x * squareSize,
-                guess.y * squareSize,
-                squareSize,
-                squareSize,
+                guess.x * SQUARE_SIZE,
+                guess.y * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
             );
         });
     }

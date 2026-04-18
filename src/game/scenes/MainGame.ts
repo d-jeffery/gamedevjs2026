@@ -7,6 +7,7 @@ export class MainGame extends Scene {
   // raycaster: Raycaster;
   // ray: Raycaster.Ray;
   private camera;
+  public robots;
 
   constructor() {
     super("Game");
@@ -21,18 +22,30 @@ export class MainGame extends Scene {
     this.camera.setBackgroundColor(0xffffff);
 
     const map = [
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
-      [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
-      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
-      [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
-      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     ];
     const tilemap = this.make.tilemap({ data: map, key: 'map', tileHeight: 16, tileWidth: 16 });
     const tileset = tilemap.addTilesetImage("tiles", "tiles");
@@ -49,6 +62,11 @@ export class MainGame extends Scene {
 
     // this.ray = this.raycaster.createRay();
     const robot1 = new RobotSprite(this, 50, 200, map);
+    const robot2 = new RobotSprite(this, 200, 50, map);
+    const robot3 = new RobotSprite(this, 700, 200, map);
+    const robot4 = new RobotSprite(this, 200, 700, map);
+
+    this.robots = [robot1, robot2, robot3, robot4];
     // robot1.setFilter({
     //   width: map[0].length,
     //   height: map.length,
@@ -60,7 +78,7 @@ export class MainGame extends Scene {
     //   beliefMax: 0.99,
     // });
 
-    robot1.setFilter({
+    const basicFilter = {
       width: map[0].length,
       height: map.length,
       pStay: 0.2,
@@ -69,9 +87,18 @@ export class MainGame extends Scene {
       priorOccupancy: 0.1,
       beliefMin: 0.0,
       beliefMax: 1.0,
-    })
+    };
 
-    this.physics.add.collider(robot1, wallsLayer);
+    robot1.setFilter(basicFilter);
+    robot2.setFilter(basicFilter);
+    robot3.setFilter(basicFilter);
+    robot4.setFilter(basicFilter);
+
+
+    // this.physics.add.collider(robot1, wallsLayer);
+    // this.physics.add.collider(robot2, wallsLayer);
+    // this.physics.add.collider(robot3, wallsLayer);
+    // this.physics.add.collider(robot4, wallsLayer);
 
 
     // this.input.on("pointerdown", (pointer: Vector) => {
