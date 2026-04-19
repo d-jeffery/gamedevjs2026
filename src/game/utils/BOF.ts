@@ -1,5 +1,3 @@
-import { Tilemaps } from 'phaser';
-
 /**
  * Bayesian Occupancy Filter (BOF)
  *
@@ -81,16 +79,6 @@ export class BayesianOccupancyFilter {
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.state = this.createInitialState();
         this.map = map;
-
-        // for (let y = 0; y < this.map.length; y++) {
-        //     for (let x = 0; x < this.map[0].length; x++) {
-        //         // Walls have no belief
-        //         if (this.map[x][y] === 1) {
-        //             this.state.belief[this.idx(x, y)] = 0;
-        //             this.state.predicted[this.idx(x, y)] = 0;
-        //         }
-        //     }
-        // }
     }
 
     // ---- public accessors ---------------------------------------------------

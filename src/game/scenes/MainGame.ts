@@ -1,13 +1,17 @@
-import { Scene } from "phaser";
+import * as Phaser from "phaser";
 import RobotSprite from "../game-objects/robot";
-import type { Vector } from "matter";
 
-export class MainGame extends Scene {
+export class MainGame extends Phaser.Scene {
   // raycasterPlugin: PhaserRaycaster;
   // raycaster: Raycaster;
   // ray: Raycaster.Ray;
   private camera;
+  private lightMask;
   public robots;
+
+
+  private groundLayer!: Phaser.Tilemaps.TilemapLayer;
+  private wallsLayer!: Phaser.Tilemaps.TilemapLayer;
 
   constructor() {
     super("Game");
@@ -54,11 +58,9 @@ export class MainGame extends Scene {
       throw new Error("Failed to create tileset.");
     }
 
-    const wallsLayer = tilemap.createLayer(0, tileset, 0, 0);
-    wallsLayer.setScale(2);
-    wallsLayer.setCollision([1]);
-
-    // this.raycaster = this.raycasterPlugin.createRaycaster({});
+    this.wallsLayer = tilemap.createLayer(0, tileset, 0, 0);
+    this.wallsLayer.setScale(2);
+    this.wallsLayer.setCollision([1]);
 
     // this.ray = this.raycaster.createRay();
     const robot1 = new RobotSprite(this, 50, 200, map);
@@ -99,10 +101,5 @@ export class MainGame extends Scene {
     // this.physics.add.collider(robot2, wallsLayer);
     // this.physics.add.collider(robot3, wallsLayer);
     // this.physics.add.collider(robot4, wallsLayer);
-
-
-    // this.input.on("pointerdown", (pointer: Vector) => {
-    //   robot1.setCurrentTarget({ x: pointer.x, y: pointer.y });
-    // });
   }
 }
