@@ -2,7 +2,7 @@
 import * as Phaser from "phaser";
 import { BayesianOccupancyFilter, type BOFConfig } from "../utils/BOF";
 import easystarjs from "easystarjs";
-import { buildOccludersFromLayer, flashlightStateFromScene, isPointLit, type FlashlightState, type LitResult, type SolidRect } from "../utils/FlashlightState";
+import { flashlightStateFromScene, isPointLit, type FlashlightState } from "../utils/FlashlightState";
 import type { Vector } from "matter";
 
 const SQUARE_SIZE = 32;
@@ -34,25 +34,22 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
     private filter;
     private debug;
     private filterDebug;
-    private map;
+    private map: integer[][];
     private easystar;
     private cellsSeen;
-    private health;
+    private health: integer;
 
-    private lightOrigin!: Phaser.Math.Vector2;
-    private lightDirection: number = 0; // radians
-    private lightGraphics!: Phaser.GameObjects.Graphics;
-    private overlayGraphics!: Phaser.GameObjects.Graphics;
+    public score: integer;
+
 
     private flashlight: FlashlightState;
-    private occluders: SolidRect[];
 
     private config: FlashlightConfig = {
         coneHalfAngle: 35,       // 70° total cone
         numRays: 120,
         radius: 200,
-        lightColour: 0xff0000,
-        shadowAlpha: 0.00,
+        lightColour: 0xffe8a0,
+        shadowAlpha: 0.92,
     };
 
 
@@ -66,8 +63,10 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.path = [];
 
         this.setScale(0.5, 0.5)
+        this.setDepth(60)
 
-        this.health = 10;
+        this.health = 100;
+        this.score = 0;
 
         this.debug = false;
         // Enable arcade physics for moving with velocity
@@ -97,16 +96,10 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             }, loop: true
         });
 
-
-        // FlashLights
-        this.lightOrigin = new Phaser.Math.Vector2(x, y);
-        this.setupGraphicsLayers()
-
         // Build once when map loads:
-        this.occluders = buildOccludersFromLayer(this.scene.wallsLayer);
         this.flashlight = flashlightStateFromScene({
-            lightOrigin: this.lightOrigin,
-            lightDirection: this.lightDirection,
+            lightOrigin: new Phaser.Math.Vector2(x, y),
+            lightDirection: this.rotation,
             config: this.config
         });
     }
@@ -135,7 +128,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.x = x * SQUARE_SIZE + SQUARE_SIZE / 2;
         this.y = y * SQUARE_SIZE + SQUARE_SIZE / 2;
 
-        this.health = 10;
+        this.health = 100;
         this.path = [];
         this.currentTarget = null;
     }
@@ -152,8 +145,6 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         // Stop any previous movement
         this.body.velocity.x = 0;
         this.body.velocity.y = 0;
-
-        //console.log(this.path, this.currentTarget)
 
         if (this.currentTarget) {
             // Check if we have reached the current target (within a fudge factor)
@@ -206,28 +197,13 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             });
 
             if (
-                isPointInView(point, this.flashlight, this.occluders).lit
+                isPointLit(point, this.flashlight, this.scene.occluders).lit
             ) {
                 //console.log(x, y, this.filter.getPredicted());
                 this.cellsSeen.add(JSON.stringify({ x: col, y: row, occupied: false }));
                 //this.filter.setCellBelief(col, row, "min");
-
-                if (this.debug) {
-                    this.filterDebug.fillStyle(0x00ffff, this.filter.getBelief()[i]);
-                    this.filterDebug.fillRect(
-                        col * SQUARE_SIZE,
-                        row * SQUARE_SIZE,
-                        SQUARE_SIZE,
-                        SQUARE_SIZE,
-                    );
-                }
-                // console.log(this.filter.getBelief()[i]);
             }
         }
-
-
-        if (this.debug) this.debugFilter()
-
 
         this.scene.robots.forEach(robot => {
 
@@ -239,37 +215,20 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             const col = Math.floor(robot.y / this.map.length);
 
             if (
-                isPointInView(robot, this.flashlight, this.occluders).lit
-
+                isPointLit(robot, this.flashlight, this.scene.occluders).lit
             ) {
                 this.cellsSeen.add(JSON.stringify({ x: col, y: row, occupied: true }));
-
                 robot.health -= 1;
 
-                // if (this.debug) {
-                //     this.filterDebug.fillStyle(0x000000, 1.0);
-                //     this.filterDebug.fillRect(
-                //         robot.x - SQUARE_SIZE / 2,
-                //         robot.y - SQUARE_SIZE / 2,
-                //         SQUARE_SIZE,
-                //         SQUARE_SIZE,
-                //     );
-                // }
+                if (robot.health === 0) {
+                    this.score++;
+                }
             }
         });
 
-
-        // this.path.forEach((v) => {
-        //     this.filterDebug.fillStyle(0xff00ff, 1.0)
-        //     this.filterDebug.fillRect(v.x * 32, v.y * 32, 32, 32);
-        // })
-
-
-
-        this.lightOrigin.set(this.x, this.y);
+        // Flash light updates
         this.updateLightDirection();
         this.drawFlashlight();
-
     }
 
     destroy() {
@@ -297,85 +256,66 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.currentTarget = targetPosition;
     }
 
-    debugFilter() {
-        // Update BOF filter
-        const SQUARE_SIZE = 32;
+    // debugFilter() {
+    //     // Update BOF filter
+    //     const SQUARE_SIZE = 32;
 
-        this.filterDebug.clear();
+    //     this.filterDebug.clear();
 
-        if (!this.filter) {
-            return;
-        }
+    //     if (!this.filter) {
+    //         return;
+    //     }
 
-        for (let i = 0; i < this.filter.getBelief().length; i++) {
-            // for (let i = 0; i < this.filter.getBelief().length; i++) {
-            const row = Math.floor(i / this.map[0].length);
-            const col = i % this.map.length;
+    //     for (let i = 0; i < this.filter.getBelief().length; i++) {
+    //         // for (let i = 0; i < this.filter.getBelief().length; i++) {
+    //         const row = Math.floor(i / this.map[0].length);
+    //         const col = i % this.map.length;
 
-            this.filterDebug.lineStyle(2, 0x000000, 1);
-            this.filterDebug.fillStyle(0xff0000, this.filter.getBelief()[i]);
-            this.filterDebug.fillRect(
-                col * SQUARE_SIZE,
-                row * SQUARE_SIZE,
-                SQUARE_SIZE,
-                SQUARE_SIZE,
-            );
-            this.filterDebug.strokeRect(
-                col * SQUARE_SIZE,
-                row * SQUARE_SIZE,
-                SQUARE_SIZE,
-                SQUARE_SIZE,
-            );
-        }
+    //         this.filterDebug.lineStyle(2, 0x000000, 1);
+    //         this.filterDebug.fillStyle(0xff0000, this.filter.getBelief()[i]);
+    //         this.filterDebug.fillRect(
+    //             col * SQUARE_SIZE,
+    //             row * SQUARE_SIZE,
+    //             SQUARE_SIZE,
+    //             SQUARE_SIZE,
+    //         );
+    //         this.filterDebug.strokeRect(
+    //             col * SQUARE_SIZE,
+    //             row * SQUARE_SIZE,
+    //             SQUARE_SIZE,
+    //             SQUARE_SIZE,
+    //         );
+    //     }
 
-        const top3 = this.filter.topCells(3);
-        top3.forEach((guess) => {
-            this.filterDebug.lineStyle(2, 0x000000, 1);
-            this.filterDebug.fillStyle(
-                0x0000ff,
-                this.filter.getCellBelief(guess.x, guess.y),
-            );
-            this.filterDebug.fillRect(
-                guess.x * SQUARE_SIZE,
-                guess.y * SQUARE_SIZE,
-                SQUARE_SIZE,
-                SQUARE_SIZE,
-            );
-            this.filterDebug.strokeRect(
-                guess.x * SQUARE_SIZE,
-                guess.y * SQUARE_SIZE,
-                SQUARE_SIZE,
-                SQUARE_SIZE,
-            );
-        });
-    }
-
-
-
-    private setupGraphicsLayers(): void {
-        // overlayGraphics: the full-screen dark mask
-        // this.overlayGraphics = this.scene.add.graphics();
-        // this.overlayGraphics.setDepth(50);
-
-        // lightGraphics: the illuminated cone polygon punched through the overlay
-        this.lightGraphics = this.scene.add.graphics();
-        this.lightGraphics.setDepth(51);
-        this.lightGraphics.setBlendMode(Phaser.BlendModes.ERASE);
-    }
+    //     const top3 = this.filter.topCells(3);
+    //     top3.forEach((guess) => {
+    //         this.filterDebug.lineStyle(2, 0x000000, 1);
+    //         this.filterDebug.fillStyle(
+    //             0x0000ff,
+    //             this.filter.getCellBelief(guess.x, guess.y),
+    //         );
+    //         this.filterDebug.fillRect(
+    //             guess.x * SQUARE_SIZE,
+    //             guess.y * SQUARE_SIZE,
+    //             SQUARE_SIZE,
+    //             SQUARE_SIZE,
+    //         );
+    //         this.filterDebug.strokeRect(
+    //             guess.x * SQUARE_SIZE,
+    //             guess.y * SQUARE_SIZE,
+    //             SQUARE_SIZE,
+    //             SQUARE_SIZE,
+    //         );
+    //     });
+    // }
 
 
     private updateLightDirection(): void {
 
-        this.lightDirection = this.rotation;
+        // this.lightDirection = this.rotation;
+        this.flashlight.direction = this.rotation;
+        this.flashlight.origin = { x: this.x, y: this.y }
 
-        // Recalculate each frame in case the player moved
-        //const pointer = this.input.activePointer;
-        // this.lightDirection = Phaser.Math.Angle.Between(
-        //     this.lightOrigin.x,
-        //     this.lightOrigin.y,
-        //     pointer.worldX,
-        //     pointer.worldY,
-        // );
     }
 
     // ---------------------------------------------------------------------------
@@ -393,32 +333,33 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
      */
     private drawFlashlight(): void {
         const { coneHalfAngle, numRays, radius, shadowAlpha } = this.config;
-        const { x: ox, y: oy } = this.lightOrigin;
+        const { x: ox, y: oy } = this.flashlight.origin;
         const halfRad = Phaser.Math.DegToRad(coneHalfAngle);
 
         // --- cast all rays ---
         const points: Phaser.Math.Vector2[] = [];
         for (let i = 0; i <= numRays; i++) {
-            const angle = this.lightDirection - halfRad + (i / numRays) * halfRad * 2;
+            const angle = this.flashlight.direction - halfRad + (i / numRays) * halfRad * 2;
             const hit = this.castRay(ox, oy, angle);
             points.push(new Phaser.Math.Vector2(hit.x, hit.y));
         }
 
         // --- 1. Full-screen dark overlay ---
-        // this.overlayGraphics.clear();
-        // this.overlayGraphics.fillStyle(0x000000, shadowAlpha);
-        // this.overlayGraphics.fillRect(0, 0, this.scale.width, this.scale.height);
+        // this.scene.overlayGraphics.clear();
+        // this.scene.overlayGraphics.fillStyle(0x000000, shadowAlpha);
+        // // this.overlayGraphics.fillRect(0, 0, this.scale.width, this.scale.height);
+        // this.scene.overlayGraphics.fillRect(0, 0, 768, 768);
 
         // --- 2. Erase the cone from the overlay ---
-        this.lightGraphics.clear();
-        this.lightGraphics.fillStyle(0xff0000, 1);
-        this.lightGraphics.beginPath();
-        this.lightGraphics.moveTo(ox, oy);
+        this.scene.lightGraphics.clear();
+        this.scene.lightGraphics.fillStyle(0xffffff, 1);
+        this.scene.lightGraphics.beginPath();
+        this.scene.lightGraphics.moveTo(ox, oy);
         for (const p of points) {
-            this.lightGraphics.lineTo(p.x, p.y);
+            this.scene.lightGraphics.lineTo(p.x, p.y);
         }
-        this.lightGraphics.closePath();
-        this.lightGraphics.fillPath();
+        this.scene.lightGraphics.closePath();
+        this.scene.lightGraphics.fillPath();
 
         // --- 3. Soft radial falloff (drawn in NORMAL blend on top) ---
         this.drawRadialFalloff(ox, oy, radius, halfRad, points);
@@ -499,7 +440,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
      */
     private isSolid(wx: number, wy: number): boolean {
         // Out-of-bounds → treat as solid so rays don't escape the map
-        if (wx < 0 || wy < 0 || wx >= this.scene.scale.width || wy >= this.scene.scale.height) {
+        if (wx < 0 || wy < 0 || wx >= this.scene.scale.width || wy >= this.scene.scale.height - 32) {
             return true;
         }
 
@@ -533,13 +474,13 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             const alpha = Phaser.Math.Easing.Quadratic.In(t) * 0.55;
             const stepRadius = radius * t;
 
-            falloffGraphics.fillStyle(0x00ff00, alpha);
+            falloffGraphics.fillStyle(0xffffff, alpha);
             falloffGraphics.beginPath();
             falloffGraphics.moveTo(ox, oy);
 
             for (let i = 0; i <= outerPoints.length - 1; i++) {
                 const angle =
-                    this.lightDirection -
+                    this.flashlight.direction -
                     halfRad +
                     (i / (outerPoints.length - 1)) * halfRad * 2;
                 const dist = Math.hypot(outerPoints[i].x - ox, outerPoints[i].y - oy);
@@ -577,7 +518,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             }
 
             const angleToTile = Phaser.Math.Angle.Between(ox, oy, tx, ty);
-            let diff = Phaser.Math.Angle.Wrap(angleToTile - this.lightDirection);
+            let diff = Phaser.Math.Angle.Wrap(angleToTile - this.flashlight.direction);
             if (Math.abs(diff) > halfRad + 0.25) {
                 tile.tint = 0xffffff; // outside cone
                 return;
@@ -601,12 +542,6 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
     public setFlashlightConfig(partial: Partial<FlashlightConfig>): void {
         Object.assign(this.config, partial);
     }
-}
-
-function isPointInView(point: Phaser.Math.Vector2, flashlight: FlashlightState, occluders: SolidRect[]): LitResult {
-    // Test an enemy position every frame:
-    const enemyPos: Vector = { x: point.x, y: point.y };
-    return isPointLit(enemyPos, flashlight, occluders);
 }
 
 export default RobotSprite;

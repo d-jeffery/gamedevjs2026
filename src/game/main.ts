@@ -13,7 +13,7 @@ import { Preloader } from "./scenes/Preloader.ts";
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
     width: 768,
-    height: 768,
+    height: 800,
     parent: "game-container",
     backgroundColor: "#028af8",
     scene: [Boot, Preloader, MainMenu, MainGame],

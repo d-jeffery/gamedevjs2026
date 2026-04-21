@@ -1,29 +1,44 @@
 import * as Phaser from "phaser";
 import RobotSprite from "../game-objects/robot";
+import { type SolidRect, buildOccludersFromLayer } from "../utils/FlashlightState";
+
+const GRID_CELL = 32;
+const WIDTH = 768;
+const HEIGHT = 768;
 
 export class MainGame extends Phaser.Scene {
   // raycasterPlugin: PhaserRaycaster;
   // raycaster: Raycaster;
   // ray: Raycaster.Ray;
+  private score;
   private camera;
   private lightMask;
   public robots;
 
 
-  private groundLayer!: Phaser.Tilemaps.TilemapLayer;
+  public occluders!: SolidRect[];
+
+  //private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private wallsLayer!: Phaser.Tilemaps.TilemapLayer;
+
+  private lightGraphics!: Phaser.GameObjects.Graphics;
+  private overlayGraphics!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super("Game");
   }
 
   preload() {
-    this.load.image("tiles", "src/assets/tilemaps/tiles.png");
+    this.load.image("tiles", "assets/tilemaps/tiles.png");
   }
 
   create() {
     this.camera = this.cameras.main;
     this.camera.setBackgroundColor(0xffffff);
+
+
+    const grid = this.add.grid(0, 0, WIDTH, HEIGHT, GRID_CELL / 2, GRID_CELL / 2, 0xffffff, 1, 0x000000, 0.5);
+    grid.setScale(2);
 
     const map = [
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -37,8 +52,8 @@ export class MainGame extends Phaser.Scene {
       [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
       [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
       [0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0],
@@ -59,14 +74,23 @@ export class MainGame extends Phaser.Scene {
     }
 
     this.wallsLayer = tilemap.createLayer(0, tileset, 0, 0);
+    this.wallsLayer.setDepth(0);
     this.wallsLayer.setScale(2);
     this.wallsLayer.setCollision([1]);
 
-    // this.ray = this.raycaster.createRay();
-    const robot1 = new RobotSprite(this, 50, 200, map);
-    const robot2 = new RobotSprite(this, 200, 50, map);
-    const robot3 = new RobotSprite(this, 700, 200, map);
-    const robot4 = new RobotSprite(this, 200, 700, map);
+
+    // Build once when map loads:
+    this.occluders = buildOccludersFromLayer(this.wallsLayer);
+
+    // FlashLights
+    this.setupGraphicsLayers()
+
+    this.events.on("update", this.update, this);
+
+    const robot1 = new RobotSprite(this, GRID_CELL, GRID_CELL, map);
+    const robot2 = new RobotSprite(this, GRID_CELL, HEIGHT - GRID_CELL, map);
+    const robot3 = new RobotSprite(this, WIDTH - GRID_CELL, GRID_CELL, map);
+    const robot4 = new RobotSprite(this, WIDTH - GRID_CELL, HEIGHT - GRID_CELL, map);
 
     this.robots = [robot1, robot2, robot3, robot4];
     // robot1.setFilter({
@@ -101,5 +125,37 @@ export class MainGame extends Phaser.Scene {
     // this.physics.add.collider(robot2, wallsLayer);
     // this.physics.add.collider(robot3, wallsLayer);
     // this.physics.add.collider(robot4, wallsLayer);
+    this.score = this.add.text(0, 768, "Loading...", { color: 0xffffff, fontFamily: "Roboto", fontSize: 24, align: "center", fixedWidth: 768 })
+
+  }
+
+  update(time: number, delta: number): void {
+    // --- 1. Full-screen dark overlay ---
+    this.overlayGraphics.clear();
+    this.overlayGraphics.fillStyle(0x000000, 0.92);
+    // this.overlayGraphics.fillRect(0, 0, this.scale.width, this.scale.height);
+    this.overlayGraphics.fillRect(0, 0, this.wallsLayer.width * this.wallsLayer.scaleX, this.wallsLayer.height * this.wallsLayer.scaleY);
+
+    this.doScore()
+  }
+
+  private doScore(): void {
+    let score = [];
+
+    this.robots.forEach((robot, index) => {
+      score.push("Robot " + (index + 1) + ": " + robot.score);
+    });
+    this.score.setText(score.join(" | "))
+  }
+
+  private setupGraphicsLayers(): void {
+    // overlayGraphics: the full-screen dark mask
+    this.overlayGraphics = this.add.graphics();
+    this.overlayGraphics.setDepth(50);
+
+    // lightGraphics: the illuminated cone polygon punched through the overlay
+    this.lightGraphics = this.add.graphics();
+    this.lightGraphics.setDepth(51);
+    this.lightGraphics.setBlendMode(Phaser.BlendModes.ERASE);
   }
 }
