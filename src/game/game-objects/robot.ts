@@ -28,6 +28,7 @@ interface FlashlightConfig {
 
 
 class RobotSprite extends Phaser.GameObjects.Sprite {
+    private originPoint;
     private path!: Phaser.Math.Vector2[];
     private currentTarget: Phaser.Math.Vector2 | null;
     private filter!: BayesianOccupancyFilter;
@@ -59,6 +60,8 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
     constructor(scene: Phaser.Scene, x: number, y: number, color: number, map: number[][]) {
         super(scene, x, y, "robot");
 
+
+        this.originPoint = { x: x, y: y }
         this.scene = scene;
         this.map = map;
         this.color = color;
@@ -121,16 +124,19 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
     }
 
     respawn() {
-        let x = Phaser.Math.Between(0, this.map[0].length - 1);
-        let y = Phaser.Math.Between(0, this.map.length - 1);
+        // let x = Phaser.Math.Between(0, this.map[0].length - 1);
+        // let y = Phaser.Math.Between(0, this.map.length - 1);
 
-        while (this.map[x][y] === 1) {
-            x = Phaser.Math.Between(0, this.map[0].length - 1);
-            y = Phaser.Math.Between(0, this.map.length - 1);
-        }
+        // while (this.map[x][y] === 1) {
+        //     x = Phaser.Math.Between(0, this.map[0].length - 1);
+        //     y = Phaser.Math.Between(0, this.map.length - 1);
+        // }
 
-        this.x = x * SQUARE_SIZE + SQUARE_SIZE / 2;
-        this.y = y * SQUARE_SIZE + SQUARE_SIZE / 2;
+        // this.x = x * SQUARE_SIZE + SQUARE_SIZE / 2;
+        // this.y = y * SQUARE_SIZE + SQUARE_SIZE / 2;
+
+        this.x = this.originPoint.x;
+        this.y = this.originPoint.y;
 
         this.health = 100;
         this.path = [];
@@ -139,7 +145,6 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
 
     update(time: number, deltaTime: number) {
         if (this.health <= 0) {
-            console.log("I'm dead. Respawn")
             this.respawn()
             return;
         }
@@ -161,7 +166,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
 
             // Slow down as we approach final point in the path. This helps prevent issues with the
             // physics body overshooting the goal and leaving the mesh.
-            let speed = 400;
+            let speed = 300;
 
             // Still got a valid target?
             if (this.currentTarget) {
@@ -222,6 +227,8 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
                 isPointLit(robot, this.flashlight, this.scene.occluders).lit
             ) {
                 this.cellsSeen.add(JSON.stringify({ x: col, y: row, occupied: true }));
+                //this.currentTarget = null;
+                this.path = [];
                 robot.health -= 1;
 
                 if (robot.health === 0) {
@@ -231,7 +238,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         });
 
         // Flash light updates
-        this.updateLightDirection();
+        this.updateLightDirection(deltaTime);
         this.drawFlashlight();
     }
 
@@ -314,11 +321,15 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
     // }
 
 
-    private updateLightDirection(): void {
-
-        // this.lightDirection = this.rotation;
-        this.flashlight.direction = this.rotation;
+    private updateLightDirection(deltaTime: number): void {
         this.flashlight.origin = { x: this.x, y: this.y }
+
+        //const targetAngle = Phaser.Math.Angle.Between(sprite.x, sprite.y, pointer.x, pointer.y);
+        const lerpSpeed = 0.1; // Adjust for faster/slower rotation (0 to 1)
+
+        // Smoothly rotate the sprite towards the target angle
+        this.flashlight.direction = Phaser.Math.Angle.RotateTo(this.flashlight.direction, this.rotation, lerpSpeed);
+
 
     }
 
