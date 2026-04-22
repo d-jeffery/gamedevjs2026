@@ -10,9 +10,11 @@ export class MainGame extends Phaser.Scene {
   // raycasterPlugin: PhaserRaycaster;
   // raycaster: Raycaster;
   // ray: Raycaster.Ray;
-  private score;
+  private scoreOne;
+  private scoreTwo;
+  private scoreThree;
+  private scoreFour;
   private camera;
-  private lightMask;
   public robots;
 
 
@@ -34,7 +36,7 @@ export class MainGame extends Phaser.Scene {
 
   create() {
     this.camera = this.cameras.main;
-    this.camera.setBackgroundColor(0xffffff);
+    this.camera.setBackgroundColor(0x000000);
 
 
     const grid = this.add.grid(0, 0, WIDTH, HEIGHT, GRID_CELL / 2, GRID_CELL / 2, 0xffffff, 1, 0x000000, 0.5);
@@ -87,10 +89,10 @@ export class MainGame extends Phaser.Scene {
 
     this.events.on("update", this.update, this);
 
-    const robot1 = new RobotSprite(this, GRID_CELL, GRID_CELL, map);
-    const robot2 = new RobotSprite(this, GRID_CELL, HEIGHT - GRID_CELL, map);
-    const robot3 = new RobotSprite(this, WIDTH - GRID_CELL, GRID_CELL, map);
-    const robot4 = new RobotSprite(this, WIDTH - GRID_CELL, HEIGHT - GRID_CELL, map);
+    const robot1 = new RobotSprite(this, GRID_CELL, GRID_CELL, 0xffff00, map);
+    const robot2 = new RobotSprite(this, GRID_CELL, HEIGHT - GRID_CELL, 0xff0000, map);
+    const robot3 = new RobotSprite(this, WIDTH - GRID_CELL, GRID_CELL, 0x00ff00, map);
+    const robot4 = new RobotSprite(this, WIDTH - GRID_CELL, HEIGHT - GRID_CELL, 0x0000ff, map);
 
     this.robots = [robot1, robot2, robot3, robot4];
     // robot1.setFilter({
@@ -125,7 +127,13 @@ export class MainGame extends Phaser.Scene {
     // this.physics.add.collider(robot2, wallsLayer);
     // this.physics.add.collider(robot3, wallsLayer);
     // this.physics.add.collider(robot4, wallsLayer);
-    this.score = this.add.text(0, 768, "Loading...", { color: 0xffffff, fontFamily: "Roboto", fontSize: 24, align: "center", fixedWidth: 768 })
+    // this.score = this.add.text(0, 768, "Loading...", { color: 0xffffff, fontFamily: "Roboto", fontSize: 24, align: "center", fixedWidth: 768 })
+
+
+    this.scoreOne = this.add.text(32, 768, "Loading...", { color: "rgb(255,255,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
+    this.scoreTwo = this.add.text(224, 768, "Loading...", { color: "rgb(255,0,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
+    this.scoreThree = this.add.text(416, 768, "Loading...", { color: "rgb(0,255,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
+    this.scoreFour = this.add.text(608, 768, "Loading...", { color: "rgb(0,0,255)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
 
   }
 
@@ -140,12 +148,17 @@ export class MainGame extends Phaser.Scene {
   }
 
   private doScore(): void {
-    let score = [];
 
-    this.robots.forEach((robot, index) => {
-      score.push("Robot " + (index + 1) + ": " + robot.score);
-    });
-    this.score.setText(score.join(" | "))
+    this.scoreOne.setText("Robot " + 1 + ": " + this.robots[0].score);
+    this.scoreTwo.setText("Robot " + 2 + ": " + this.robots[1].score);
+    this.scoreThree.setText("Robot " + 3 + ": " + this.robots[2].score);
+    this.scoreFour.setText("Robot " + 4 + ": " + this.robots[3].score);
+
+
+    // const score = this.robots.map((robot, index) => {
+    //   return ("Robot " + (index + 1) + ": " + robot.score);
+    // });
+    //this.score.setText([robot1].join(" | "))
   }
 
   private setupGraphicsLayers(): void {

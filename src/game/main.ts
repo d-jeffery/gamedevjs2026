@@ -25,23 +25,6 @@ const config: Phaser.Types.Core.GameConfig = {
         arcade: {
             gravity: { x: 0, y: 0 },
         },
-
-        //   plugins: {
-        //     scene: [
-        //       {
-        //         key: "NavMeshPlugin",
-        //         plugin: PhaserNavMeshPlugin,
-        //         mapping: "navMeshPlugin",
-        //         start: true,
-        //       },
-        //     ],
-        //   },
-        //   physics: {
-        //     default: "arcade",
-        //     arcade: {
-        //       gravity: 0,
-        //     },
-        //   },
     },
 
 };

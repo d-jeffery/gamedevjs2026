@@ -3,7 +3,6 @@ import * as Phaser from "phaser";
 import { BayesianOccupancyFilter, type BOFConfig } from "../utils/BOF";
 import easystarjs from "easystarjs";
 import { flashlightStateFromScene, isPointLit, type FlashlightState } from "../utils/FlashlightState";
-import type { Vector } from "matter";
 
 const SQUARE_SIZE = 32;
 
@@ -29,20 +28,24 @@ interface FlashlightConfig {
 
 
 class RobotSprite extends Phaser.GameObjects.Sprite {
-    private path;
-    private currentTarget;
-    private filter;
-    private debug;
-    private filterDebug;
+    private path!: Phaser.Math.Vector2[];
+    private currentTarget: Phaser.Math.Vector2 | null;
+    private filter!: BayesianOccupancyFilter;
+    // private debug;
+    // private filterDebug;
     private map: integer[][];
-    private easystar;
-    private cellsSeen;
+    private easystar!: easystarjs.js;
+    private cellsSeen: Set<{
+        x: number;
+        y: number;
+        occupied: boolean;
+    }>;
     private health: integer;
 
     public score: integer;
 
-
     private flashlight: FlashlightState;
+    private color: number;
 
     private config: FlashlightConfig = {
         coneHalfAngle: 35,       // 70° total cone
@@ -53,11 +56,12 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
     };
 
 
-    constructor(scene: Phaser.Scene, x: number, y: number, map: number[][]) {
+    constructor(scene: Phaser.Scene, x: number, y: number, color: number, map: number[][]) {
         super(scene, x, y, "robot");
 
         this.scene = scene;
         this.map = map;
+        this.color = color;
 
         this.currentTarget = null;
         this.path = [];
@@ -68,7 +72,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.health = 100;
         this.score = 0;
 
-        this.debug = false;
+        // this.debug = false;
         // Enable arcade physics for moving with velocity
         scene.physics.world.enable(this);
 
@@ -78,7 +82,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
 
         this.cellsSeen = new Set<{ x: number; y: number; occupied: boolean }>();
 
-        if (this.debug) this.filterDebug = scene.add.graphics();
+        // if (this.debug) this.filterDebug = scene.add.graphics();
 
         scene.time.addEvent({
             delay: 250, callback: () => {
@@ -474,7 +478,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             const alpha = Phaser.Math.Easing.Quadratic.In(t) * 0.55;
             const stepRadius = radius * t;
 
-            falloffGraphics.fillStyle(0xffffff, alpha);
+            falloffGraphics.fillStyle(this.color, alpha);
             falloffGraphics.beginPath();
             falloffGraphics.moveTo(ox, oy);
 
