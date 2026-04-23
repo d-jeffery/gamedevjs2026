@@ -69,7 +69,6 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.currentTarget = null;
         this.path = [];
 
-        this.setScale(0.5, 0.5)
         this.setDepth(60)
 
         this.health = 100;
@@ -116,6 +115,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.easystar = new easystarjs.js()
         this.easystar.setGrid(this.map);
         this.easystar.setAcceptableTiles([0]);
+        this.easystar.enableCornerCutting();
 
         this.filter = new BayesianOccupancyFilter(config, this.map);
 
@@ -234,6 +234,10 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
                 if (robot.health === 0) {
                     this.score++;
                 }
+
+                const angle = Phaser.Math.Angle.Between(this.x, this.y, robot.x, robot.y);
+                const lerpSpeed = 0.05;
+                this.rotation = Phaser.Math.Angle.RotateTo(this.rotation, angle, lerpSpeed);
             }
         });
 
@@ -325,12 +329,10 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.flashlight.origin = { x: this.x, y: this.y }
 
         //const targetAngle = Phaser.Math.Angle.Between(sprite.x, sprite.y, pointer.x, pointer.y);
-        const lerpSpeed = 0.1; // Adjust for faster/slower rotation (0 to 1)
+        const lerpSpeed = 0.05; // Adjust for faster/slower rotation (0 to 1)
 
         // Smoothly rotate the sprite towards the target angle
         this.flashlight.direction = Phaser.Math.Angle.RotateTo(this.flashlight.direction, this.rotation, lerpSpeed);
-
-
     }
 
     // ---------------------------------------------------------------------------

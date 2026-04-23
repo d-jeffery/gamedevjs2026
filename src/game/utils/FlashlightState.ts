@@ -183,6 +183,7 @@ export function isPointLit(
     flashlight: FlashlightState,
     occluders: SolidRect[],
 ): LitResult {
+
     const { origin, direction, coneHalfAngle, radius } = flashlight;
 
     // --- 1. Distance check (cheap, no sqrt yet) ---
@@ -236,8 +237,8 @@ export function buildOccludersFromLayer(
         occluders.push({
             x: tile.getLeft(),
             y: tile.getTop(),
-            width: tile.width,
-            height: tile.height,
+            width: tile.width * 2,
+            height: tile.height * 2,
         });
     });
 
