@@ -29,11 +29,13 @@ interface FlashlightConfig {
 
 class RobotSprite extends Phaser.GameObjects.Sprite {
     private originPoint;
+    private speed: number;
+
     private path!: Phaser.Math.Vector2[];
     private currentTarget: Phaser.Math.Vector2 | null;
     private filter!: BayesianOccupancyFilter;
-    // private debug;
-    // private filterDebug;
+    private filterUpdate: Phaser.Time.TimerEvent;
+
     private map: integer[][];
     private easystar!: easystarjs.js;
     private cellsSeen: Set<{
@@ -56,12 +58,16 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         shadowAlpha: 0.92,
     };
 
+    private debug: boolean;
+    private filterDebug;
+
 
     constructor(scene: Phaser.Scene, x: number, y: number, color: number, map: number[][]) {
         super(scene, x, y, "robot");
 
-
         this.originPoint = { x: x, y: y }
+        this.speed = 250;
+
         this.scene = scene;
         this.map = map;
         this.color = color;
@@ -86,7 +92,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
 
         // if (this.debug) this.filterDebug = scene.add.graphics();
 
-        scene.time.addEvent({
+        this.filterUpdate = scene.time.addEvent({
             delay: 250, callback: () => {
                 this.filter.tick(0.12 /* noise rate */);
 
@@ -108,6 +114,36 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             lightDirection: this.rotation,
             config: this.config
         });
+
+        this.filterDebug = scene.add.graphics();
+        this.debug = false;
+    }
+
+    setSpeed(value: number) {
+        this.speed = value;
+    }
+
+    setFilterSpeed(value: number) {
+        this.scene.time.removeEvent(this.filterUpdate);
+        this.filterUpdate = this.scene.time.addEvent({
+            delay: value, callback: () => {
+                this.filter.tick(0.12 /* noise rate */);
+
+                const seen = Array.from(this.cellsSeen).map((s) => JSON.parse(s));
+                this.filter.applyHardEvidence(seen);
+                this.cellsSeen.clear();
+
+                const top3 = this.filter.topCells(3);
+
+                if (!this.filter.maxBelief()) {
+                    this.filter.reset(top3);
+                }
+            }, loop: true
+        });
+    }
+
+    setDebug(value: boolean) {
+        this.debug = value;
     }
 
     setFilter(config: BOFConfig) {
@@ -151,6 +187,10 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
 
         if (!this.body) return;
 
+        if (!this.debug) {
+            this.filterDebug.clear();
+        }
+
         // Stop any previous movement
         this.body.velocity.x = 0;
         this.body.velocity.y = 0;
@@ -166,11 +206,9 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
 
             // Slow down as we approach final point in the path. This helps prevent issues with the
             // physics body overshooting the goal and leaving the mesh.
-            let speed = 300;
-
             // Still got a valid target?
             if (this.currentTarget) {
-                this.moveTowards(this.currentTarget, speed, deltaTime / 1000);
+                this.moveTowards(this.currentTarget, this.speed, deltaTime / 1000);
             }
         } else if (this.path.length) {
             const newTagert = this.path.shift();
@@ -271,6 +309,53 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.currentTarget = targetPosition;
     }
 
+    drawDebug() {
+
+        this.filterDebug.clear();
+
+        for (let i = 0; i < this.filter.getBelief().length; i++) {
+            // for (let i = 0; i < this.filter.getBelief().length; i++) {
+            const row = Math.floor(i / this.map[0].length);
+            const col = i % this.map.length;
+
+            this.filterDebug.lineStyle(2, 0x000000, 1);
+            this.filterDebug.fillStyle(0xff0000, this.filter.getBelief()[i]);
+            this.filterDebug.fillRect(
+                col * SQUARE_SIZE,
+                row * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
+            );
+            this.filterDebug.strokeRect(
+                col * SQUARE_SIZE,
+                row * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
+            );
+        }
+
+        const top3 = this.filter.topCells(3);
+        top3.forEach((guess) => {
+            this.filterDebug.lineStyle(2, 0x000000, 1);
+            this.filterDebug.fillStyle(
+                0x0000ff,
+                this.filter.getCellBelief(guess.x, guess.y),
+            );
+            this.filterDebug.fillRect(
+                guess.x * SQUARE_SIZE,
+                guess.y * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
+            );
+            this.filterDebug.strokeRect(
+                guess.x * SQUARE_SIZE,
+                guess.y * SQUARE_SIZE,
+                SQUARE_SIZE,
+                SQUARE_SIZE,
+            );
+        });
+    }
+
     // debugFilter() {
     //     // Update BOF filter
     //     const SQUARE_SIZE = 32;
@@ -281,47 +366,47 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
     //         return;
     //     }
 
-    //     for (let i = 0; i < this.filter.getBelief().length; i++) {
-    //         // for (let i = 0; i < this.filter.getBelief().length; i++) {
-    //         const row = Math.floor(i / this.map[0].length);
-    //         const col = i % this.map.length;
+    // for (let i = 0; i < this.filter.getBelief().length; i++) {
+    //     // for (let i = 0; i < this.filter.getBelief().length; i++) {
+    //     const row = Math.floor(i / this.map[0].length);
+    //     const col = i % this.map.length;
 
-    //         this.filterDebug.lineStyle(2, 0x000000, 1);
-    //         this.filterDebug.fillStyle(0xff0000, this.filter.getBelief()[i]);
-    //         this.filterDebug.fillRect(
-    //             col * SQUARE_SIZE,
-    //             row * SQUARE_SIZE,
-    //             SQUARE_SIZE,
-    //             SQUARE_SIZE,
-    //         );
-    //         this.filterDebug.strokeRect(
-    //             col * SQUARE_SIZE,
-    //             row * SQUARE_SIZE,
-    //             SQUARE_SIZE,
-    //             SQUARE_SIZE,
-    //         );
-    //     }
+    //     this.filterDebug.lineStyle(2, 0x000000, 1);
+    //     this.filterDebug.fillStyle(0xff0000, this.filter.getBelief()[i]);
+    //     this.filterDebug.fillRect(
+    //         col * SQUARE_SIZE,
+    //         row * SQUARE_SIZE,
+    //         SQUARE_SIZE,
+    //         SQUARE_SIZE,
+    //     );
+    //     this.filterDebug.strokeRect(
+    //         col * SQUARE_SIZE,
+    //         row * SQUARE_SIZE,
+    //         SQUARE_SIZE,
+    //         SQUARE_SIZE,
+    //     );
+    // }
 
-    //     const top3 = this.filter.topCells(3);
-    //     top3.forEach((guess) => {
-    //         this.filterDebug.lineStyle(2, 0x000000, 1);
-    //         this.filterDebug.fillStyle(
-    //             0x0000ff,
-    //             this.filter.getCellBelief(guess.x, guess.y),
-    //         );
-    //         this.filterDebug.fillRect(
-    //             guess.x * SQUARE_SIZE,
-    //             guess.y * SQUARE_SIZE,
-    //             SQUARE_SIZE,
-    //             SQUARE_SIZE,
-    //         );
-    //         this.filterDebug.strokeRect(
-    //             guess.x * SQUARE_SIZE,
-    //             guess.y * SQUARE_SIZE,
-    //             SQUARE_SIZE,
-    //             SQUARE_SIZE,
-    //         );
-    //     });
+    // const top3 = this.filter.topCells(3);
+    // top3.forEach((guess) => {
+    //     this.filterDebug.lineStyle(2, 0x000000, 1);
+    //     this.filterDebug.fillStyle(
+    //         0x0000ff,
+    //         this.filter.getCellBelief(guess.x, guess.y),
+    //     );
+    //     this.filterDebug.fillRect(
+    //         guess.x * SQUARE_SIZE,
+    //         guess.y * SQUARE_SIZE,
+    //         SQUARE_SIZE,
+    //         SQUARE_SIZE,
+    //     );
+    //     this.filterDebug.strokeRect(
+    //         guess.x * SQUARE_SIZE,
+    //         guess.y * SQUARE_SIZE,
+    //         SQUARE_SIZE,
+    //         SQUARE_SIZE,
+    //     );
+    // });
     // }
 
 
@@ -457,7 +542,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
      */
     private isSolid(wx: number, wy: number): boolean {
         // Out-of-bounds → treat as solid so rays don't escape the map
-        if (wx < 0 || wy < 0 || wx >= this.scene.scale.width || wy >= this.scene.scale.height - 32) {
+        if (wx < 0 || wy < 0 || wx >= this.scene.scale.width || wy >= this.scene.scale.height - 96) {
             return true;
         }
 

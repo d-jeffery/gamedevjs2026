@@ -14,6 +14,14 @@ export class MainGame extends Phaser.Scene {
   private scoreTwo;
   private scoreThree;
   private scoreFour;
+
+  // Controlls
+  private speed;
+  private filterSpeed;
+  private debugMode;
+
+  private debug;
+
   private camera;
   public robots;
 
@@ -38,6 +46,7 @@ export class MainGame extends Phaser.Scene {
     this.camera = this.cameras.main;
     this.camera.setBackgroundColor(0x000000);
 
+    this.debug = false;
 
     const grid = this.add.grid(0, 0, WIDTH, HEIGHT, GRID_CELL / 2, GRID_CELL / 2, 0xffffff, 1, 0x000000, 0.5);
     grid.setScale(2);
@@ -130,15 +139,54 @@ export class MainGame extends Phaser.Scene {
     // this.score = this.add.text(0, 768, "Loading...", { color: 0xffffff, fontFamily: "Roboto", fontSize: 24, align: "center", fixedWidth: 768 })
 
 
-    this.scoreOne = this.add.text(32, 768, "Loading...", { color: "rgb(255,255,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
-    this.scoreTwo = this.add.text(224, 768, "Loading...", { color: "rgb(255,0,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
-    this.scoreThree = this.add.text(416, 768, "Loading...", { color: "rgb(0,255,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
-    this.scoreFour = this.add.text(608, 768, "Loading...", { color: "rgb(0,0,255)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
+    this.scoreOne = this.add.text(32, 780, "Loading...", { color: "rgb(255,255,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
+    this.scoreTwo = this.add.text(224, 780, "Loading...", { color: "rgb(255,0,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
+    this.scoreThree = this.add.text(416, 780, "Loading...", { color: "rgb(0,255,0)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
+    this.scoreFour = this.add.text(608, 780, "Loading...", { color: "rgb(0,0,255)", fontFamily: "Arial Black", fontSize: 24, align: "center" });
 
+
+    this.speed = this.add.dom(150, 832).createFromHTML(`
+      <label for="speed" style="color: white; font-size: 24px;"/> Speed </label>
+      <input type="range" name="speed" min="100" max="500" value="250" style="width: 100px;">
+    `);
+
+    this.speed.getChildByName('speed').addEventListener('input', (event) => {
+      this.robots.forEach((robot: RobotSprite) => {
+        robot.setSpeed(event.target.value);
+      });
+    });
+
+    this.filterSpeed = this.add.dom(400, 832).createFromHTML(`
+      <label for="filterSpeed" style="color: white; font-size: 24px;"/> Sample Speed </label>
+      <input type="range" name="filterSpeed" min="100" max="500" value="250" style="width: 100px;">
+    `);
+
+    this.filterSpeed.getChildByName('filterSpeed').addEventListener('input', (event) => {
+      this.robots.forEach((robot: RobotSprite) => {
+        robot.setFilterSpeed(600 - event.target.value);
+      });
+    });
+
+    this.debugMode = this.add.dom(650, 832).createFromHTML(`
+      <label for="debug" style="color: white; font-size: 24px;"/> Debug Mode </label>
+      <input type="checkbox" name="debug" value="no">
+      `);
+
+    this.debugMode.getChildByName('debug').addEventListener('input', (event) => {
+      this.debug = event.target.checked;
+    });
   }
 
   update(time: number, delta: number): void {
-    // --- 1. Full-screen dark overlay ---
+    if (this.debug) {
+      this.overlayGraphics.clear();
+      this.robots.forEach((robot: RobotSprite) => {
+        robot.drawDebug();
+      });
+
+      return;
+    }
+
     this.overlayGraphics.clear();
     this.overlayGraphics.fillStyle(0x000000, 0.92);
     // this.overlayGraphics.fillRect(0, 0, this.scale.width, this.scale.height);
@@ -153,7 +201,6 @@ export class MainGame extends Phaser.Scene {
     this.scoreTwo.setText("Robot " + 2 + ": " + this.robots[1].score);
     this.scoreThree.setText("Robot " + 3 + ": " + this.robots[2].score);
     this.scoreFour.setText("Robot " + 4 + ": " + this.robots[3].score);
-
 
     // const score = this.robots.map((robot, index) => {
     //   return ("Robot " + (index + 1) + ": " + robot.score);
