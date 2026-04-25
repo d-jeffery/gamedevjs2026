@@ -98,10 +98,10 @@ export class MainGame extends Phaser.Scene {
 
     this.events.on("update", this.update, this);
 
-    const robot1 = new RobotSprite(this, GRID_CELL, GRID_CELL, 0xffff00, map);
-    const robot2 = new RobotSprite(this, GRID_CELL, HEIGHT - GRID_CELL, 0xff0000, map);
-    const robot3 = new RobotSprite(this, WIDTH - GRID_CELL, GRID_CELL, 0x00ff00, map);
-    const robot4 = new RobotSprite(this, WIDTH - GRID_CELL, HEIGHT - GRID_CELL, 0x0000ff, map);
+    const robot1 = new RobotSprite(this, GRID_CELL / 2, GRID_CELL / 2, 0xffff00, map);
+    const robot2 = new RobotSprite(this, GRID_CELL / 2, HEIGHT - GRID_CELL / 2, 0xff0000, map);
+    const robot3 = new RobotSprite(this, WIDTH - GRID_CELL / 2, GRID_CELL / 2, 0x00ff00, map);
+    const robot4 = new RobotSprite(this, WIDTH - GRID_CELL / 2, HEIGHT - GRID_CELL / 2, 0x0000ff, map);
 
     this.robots = [robot1, robot2, robot3, robot4];
     // robot1.setFilter({
