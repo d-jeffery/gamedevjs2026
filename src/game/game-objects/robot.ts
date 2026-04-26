@@ -45,8 +45,11 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
     }>;
     private health: integer;
 
+    private fleeing: boolean;
+
     public score: integer;
 
+    private flashlightOn: boolean;
     private flashlight: FlashlightState;
     private color: number;
 
@@ -78,6 +81,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.setDepth(60)
 
         this.health = 100;
+        this.fleeing = false;
         this.score = 0;
 
         // this.debug = false;
@@ -114,6 +118,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             lightDirection: this.rotation,
             config: this.config
         });
+        this.flashlightOn = true;
 
         this.filterDebug = scene.add.graphics();
         this.debug = false;
@@ -159,6 +164,36 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         this.filter.spawnTargets(3);
     }
 
+    flee() {
+        this.path = [];
+        this.currentTarget = null;
+        this.flashlightOn = false;
+        this.fleeing = true;
+        this.speed *= 2;
+
+
+        const startX = Math.floor(this.x / SQUARE_SIZE);
+        const startY = Math.floor(this.y / SQUARE_SIZE);
+
+        const originX = Math.floor(this.originPoint.x / SQUARE_SIZE);
+        const originY = Math.floor(this.originPoint.y / SQUARE_SIZE);
+
+        this.easystar.findPath(startX, startY, originX, originY, (path: Array<Vector>) => {
+            if (path === null) {
+                throw Error("WHAT")
+            } else {
+                this.path = path;
+                const home = this.path.shift();
+                this.currentTarget = {
+                    x: home.x * SQUARE_SIZE + SQUARE_SIZE / 2,
+                    y: home.y * SQUARE_SIZE + SQUARE_SIZE / 2
+                };
+            }
+        });
+
+        this.easystar.calculate();
+    }
+
     respawn() {
         // let x = Phaser.Math.Between(0, this.map[0].length - 1);
         // let y = Phaser.Math.Between(0, this.map.length - 1);
@@ -168,15 +203,15 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         //     y = Phaser.Math.Between(0, this.map.length - 1);
         // }
 
-        // this.x = x * SQUARE_SIZE + SQUARE_SIZE / 2;
-        // this.y = y * SQUARE_SIZE + SQUARE_SIZE / 2;
-
         this.x = this.originPoint.x;
         this.y = this.originPoint.y;
 
+        //this.fleeing = false;
         this.health = 100;
         this.path = [];
         this.currentTarget = null;
+        this.flashlightOn = true;
+        //this.speed = 250;
     }
 
     update(time: number, deltaTime: number) {
@@ -190,6 +225,15 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
         if (!this.debug) {
             this.filterDebug.clear();
         }
+
+        // if (this.fleeing && this.color === 0x0000ff) {
+        //     console.log(this.health)
+        // }
+
+        // if (this.fleeing && this.health <= 0 && !this.path.length && this.currentTarget === null) {
+        //     this.respawn()
+        //     return;
+        // }
 
         // Stop any previous movement
         this.body.velocity.x = 0;
@@ -244,7 +288,7 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             });
 
             if (
-                isPointLit(point, this.flashlight, this.scene.occluders).lit
+                this.flashlightOn && isPointLit(point, this.flashlight, this.scene.occluders).lit
             ) {
                 //console.log(x, y, this.filter.getPredicted());
                 this.cellsSeen.add(JSON.stringify({ x: col, y: row, occupied: false }));
@@ -262,16 +306,23 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             const col = Math.floor(robot.y / this.map.length);
 
             if (
-                isPointLit(robot, this.flashlight, this.scene.occluders).lit
+                this.flashlightOn && isPointLit(robot, this.flashlight, this.scene.occluders).lit
             ) {
                 this.cellsSeen.add(JSON.stringify({ x: col, y: row, occupied: true }));
                 //this.currentTarget = null;
                 this.path = [];
+
                 robot.health -= 1;
 
                 if (robot.health === 0) {
+                    this.scene.sound.play('shoot', { volume: 0.1 });
                     this.score++;
                 }
+
+                // if (!robot.fleeing && robot.health === 0) {
+                //     robot.flee();
+                //     this.score++;
+                // }
 
                 const angle = Phaser.Math.Angle.Between(this.x, this.y, robot.x, robot.y);
                 const lerpSpeed = 0.05;
@@ -279,9 +330,12 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
             }
         });
 
+
         // Flash light updates
-        this.updateLightDirection(deltaTime);
-        this.drawFlashlight();
+        if (this.flashlightOn) {
+            this.updateLightDirection(deltaTime);
+            this.drawFlashlight();
+        }
     }
 
     destroy() {
@@ -354,61 +408,19 @@ class RobotSprite extends Phaser.GameObjects.Sprite {
                 SQUARE_SIZE,
             );
         });
+
+        if (this.path.length) {
+            this.filterDebug.lineStyle(3, 0xff00ff)
+            this.filterDebug.lineBetween(
+                this.path[0].x * SQUARE_SIZE + SQUARE_SIZE / 2,
+                this.path[0].y * SQUARE_SIZE + SQUARE_SIZE / 2,
+                this.path[this.path.length - 1].x * SQUARE_SIZE + SQUARE_SIZE / 2,
+                this.path[this.path.length - 1].y * SQUARE_SIZE + SQUARE_SIZE / 2
+            )
+        }
+
+
     }
-
-    // debugFilter() {
-    //     // Update BOF filter
-    //     const SQUARE_SIZE = 32;
-
-    //     this.filterDebug.clear();
-
-    //     if (!this.filter) {
-    //         return;
-    //     }
-
-    // for (let i = 0; i < this.filter.getBelief().length; i++) {
-    //     // for (let i = 0; i < this.filter.getBelief().length; i++) {
-    //     const row = Math.floor(i / this.map[0].length);
-    //     const col = i % this.map.length;
-
-    //     this.filterDebug.lineStyle(2, 0x000000, 1);
-    //     this.filterDebug.fillStyle(0xff0000, this.filter.getBelief()[i]);
-    //     this.filterDebug.fillRect(
-    //         col * SQUARE_SIZE,
-    //         row * SQUARE_SIZE,
-    //         SQUARE_SIZE,
-    //         SQUARE_SIZE,
-    //     );
-    //     this.filterDebug.strokeRect(
-    //         col * SQUARE_SIZE,
-    //         row * SQUARE_SIZE,
-    //         SQUARE_SIZE,
-    //         SQUARE_SIZE,
-    //     );
-    // }
-
-    // const top3 = this.filter.topCells(3);
-    // top3.forEach((guess) => {
-    //     this.filterDebug.lineStyle(2, 0x000000, 1);
-    //     this.filterDebug.fillStyle(
-    //         0x0000ff,
-    //         this.filter.getCellBelief(guess.x, guess.y),
-    //     );
-    //     this.filterDebug.fillRect(
-    //         guess.x * SQUARE_SIZE,
-    //         guess.y * SQUARE_SIZE,
-    //         SQUARE_SIZE,
-    //         SQUARE_SIZE,
-    //     );
-    //     this.filterDebug.strokeRect(
-    //         guess.x * SQUARE_SIZE,
-    //         guess.y * SQUARE_SIZE,
-    //         SQUARE_SIZE,
-    //         SQUARE_SIZE,
-    //     );
-    // });
-    // }
-
 
     private updateLightDirection(deltaTime: number): void {
         this.flashlight.origin = { x: this.x, y: this.y }

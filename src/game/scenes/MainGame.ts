@@ -15,6 +15,11 @@ export class MainGame extends Phaser.Scene {
   private scoreThree;
   private scoreFour;
 
+  // private filterConfigOne;
+  // private filterConfigTwo;
+  // private filterConfigThree;
+  // private filterConfigFour;
+
   // Controlls
   private speed;
   private filterSpeed;
@@ -40,6 +45,8 @@ export class MainGame extends Phaser.Scene {
 
   preload() {
     this.load.image("tiles", "assets/tilemaps/tiles.png");
+    this.load.audio('shoot', 'assets/sound/Shoot1.wav');
+
   }
 
   create() {
@@ -178,6 +185,8 @@ export class MainGame extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    this.doScore()
+
     if (this.debug) {
       this.overlayGraphics.clear();
       this.robots.forEach((robot: RobotSprite) => {
@@ -192,7 +201,6 @@ export class MainGame extends Phaser.Scene {
     // this.overlayGraphics.fillRect(0, 0, this.scale.width, this.scale.height);
     this.overlayGraphics.fillRect(0, 0, this.wallsLayer.width * this.wallsLayer.scaleX, this.wallsLayer.height * this.wallsLayer.scaleY);
 
-    this.doScore()
   }
 
   private doScore(): void {
